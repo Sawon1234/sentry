@@ -80,7 +80,7 @@ def unmerge(source_id, fingerprints, destination_id, cursor=None, batch_size=500
 
     # If there are no more events to process, we're done with the migration.
     if not events:
-        return
+        return destination_id
 
     Event.objects.bind_nodes(events, 'data')
 
@@ -140,7 +140,10 @@ def unmerge(source_id, fingerprints, destination_id, cursor=None, batch_size=500
             destination = Group.objects.get(id=destination_id)
             destination.update(
                 **reduce(
-                    lambda data, event: {name: f(data, event) for name, f in update_fields.items()},
+                    lambda data, event: merge_mappings([
+                        data,
+                        {name: f(data, event) for name, f in update_fields.items()},
+                    ]),
                     events_to_migrate,
                     {name: getattr(destination, name) for name in set(initial_fields.keys()) | set(update_fields.keys())},
                 )
@@ -170,7 +173,7 @@ def unmerge(source_id, fingerprints, destination_id, cursor=None, batch_size=500
             event_id__in=event_event_id_set,
         ).update(group=destination_id)
 
-    # TODO: Migrate and repair `GroupTag{Key,Value}` data.
+    # TODO: Migrate and repair `GroupTag{Key,Value}` data. (Also test `EventTag` at this point.)
     # TODO: Migrate and repair `GroupRelease` data.
     # TODO: Migrate and repair TSDB data.
 
